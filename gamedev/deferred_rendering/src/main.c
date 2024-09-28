@@ -1,5 +1,6 @@
 #include "common.h"
 #include "render.c"
+#include "math.c"
 
 // Globals
 static bool g_isRunning = true;
