@@ -1,21 +1,30 @@
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
+#include "common.h"
+#include "render.c"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <assert.h>
+// Globals
+static bool g_isRunning = true;
+SDL_Window* g_pWindow = NULL;
+RenderContext_t g_RenderContext;
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl.h>
-#include <GL/gl.h>
+void mainloop()
+{
+	SDL_Event evt;
+	while(SDL_PollEvent(&evt))
+	{
+		if ((evt.type == SDL_KEYDOWN && evt.key.keysym.sym == SDLK_ESCAPE) ||
+			(evt.type == SDL_QUIT))
+		{
+			g_isRunning = false;
+			break;
+		}
+	}
 
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
+	glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+	glClearColor(0.f, 0.f, 0.f, 1.f);
+	glClear(GL_COLOR_BUFFER_BIT);
 
-typedef uint32_t u32;
+	SDL_GL_SwapWindow(g_pWindow);
+}
 
 int main(int argc, char** argv)
 {
@@ -26,38 +35,32 @@ int main(int argc, char** argv)
     }
 
     const u32 WindowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
-    SDL_Window* pWindow = SDL_CreateWindow(
+    g_pWindow = SDL_CreateWindow(
         "deferred rendering",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         SCREEN_WIDTH, SCREEN_HEIGHT,
         WindowFlags);
-    if (!pWindow)
+    if (!g_pWindow)
     {
         fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
         return -1;
     }
 
-    SDL_GLContext GLContext = SDL_GL_CreateContext(pWindow);
-    bool isRunning = true;
-    while(isRunning)
+    SDL_GLContext GLContext = SDL_GL_CreateContext(g_pWindow);
+    char* pAssetRoot = argc > 1 ? argv[1] : ".";
+    if (!DR_Initialize(&g_RenderContext, pAssetRoot))
     {
-        SDL_Event evt;
-        while(SDL_PollEvent(&evt))
-        {
-            if ((evt.type == SDL_KEYDOWN && evt.key.keysym.sym == SDLK_ESCAPE) ||
-                (evt.type == SDL_QUIT))
-            {
-                isRunning = false;
-                break;
-            }
-        }
-
-        glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        glClearColor(0.f, 0.f, 0.f, 1.f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        SDL_GL_SwapWindow(pWindow);
+        fprintf(stderr, "Failed to initialize renderer\n");
+        return -1;
     }
+
+    while(g_isRunning)
+    {
+		mainloop();
+    }
+
+	SDL_DestroyWindow(g_pWindow);
+    SDL_Quit();
     
     return 0;
 }
