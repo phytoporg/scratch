@@ -17,7 +17,7 @@ typedef struct {
     u32 NormalBuffer;
     u32 AlbedoSpecBuffer;
 
-    HSHADER BufferProgram;
+    HSHADER GeometryProgram;
     HSHADER LightProgram;
 } RenderContext_t;
 
@@ -164,6 +164,11 @@ bool DR_UseShader(HSHADER shaderHandle)
     return true;
 }
 
+void DR_SetShaderParameteri(HSHADER shaderHandle, char* pName, u32 value)
+{
+    glUniform1i(glGetUniformLocation(shaderHandle, pName), value);
+}
+
 bool DR_IsContextValid(RenderContext_t* pContext)
 {
     if (!pContext)
@@ -177,7 +182,7 @@ bool DR_IsContextValid(RenderContext_t* pContext)
         pContext->PositionBuffer &&
         pContext->NormalBuffer &&
         pContext->AlbedoSpecBuffer &&
-        pContext->BufferProgram != INVALID_SHADER_HANDLE &&
+        pContext->GeometryProgram != INVALID_SHADER_HANDLE &&
         pContext->LightProgram != INVALID_SHADER_HANDLE;
 }
 
@@ -191,7 +196,7 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
 
     // Zero out everything first, mark shaders as invalid
     memset(pContext, 0, sizeof(*pContext));
-    pContext->BufferProgram = INVALID_SHADER_HANDLE;
+    pContext->GeometryProgram = INVALID_SHADER_HANDLE;
     pContext->LightProgram = INVALID_SHADER_HANDLE;
 
     // Create and bind the g buffer
@@ -240,8 +245,8 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
         return false;
     }
 
-    pContext->BufferProgram = DR_CreateShader(vertText, fragText);
-    assert(pContext->BufferProgram != INVALID_SHADER_HANDLE);
+    pContext->GeometryProgram = DR_CreateShader(vertText, fragText);
+    assert(pContext->GeometryProgram != INVALID_SHADER_HANDLE);
 
     memset(vertText, 0, sizeof(vertText));
     memset(fragText, 0, sizeof(fragText));
@@ -273,7 +278,14 @@ void DR_BeginFrame(RenderContext_t* pContext)
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // TODO: bind shaders
+    DR_UseShader(pContext->GeometryProgram);
+
+    // TODO: all this biz
+    // DR_SetShaderParameterm4(pContext->GeometryProgram, "projection", projectionMatrix);
+    // DR_SetShaderParameterm4(pContext->GeometryProgram, "view", viewMatrix);
+
+    // DO PER OBJECT (not here):
+    // DR_SetShaderParameterm4(pContext->GeometryProgram, "model", modelMatrix);
 }
 
 void DR_EndFrame(RenderContext_t* pContext)

@@ -1,3 +1,5 @@
-- Actually set up deferred rendering stuff
+- Implement a linear algebra library lol, not gonna use glm
+- Clean up some names to make geometry and lighting passes clearer
+
 - Get emscripten build working
 - Put some thought into actual next steps and populate this TODO some more!

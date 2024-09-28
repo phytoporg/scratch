@@ -19,9 +19,8 @@ void mainloop()
 		}
 	}
 
-	glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-	glClearColor(0.f, 0.f, 0.f, 1.f);
-	glClear(GL_COLOR_BUFFER_BIT);
+    DR_BeginFrame(&g_RenderContext);
+    DR_EndFrame(&g_RenderContext);
 
 	SDL_GL_SwapWindow(g_pWindow);
 }
