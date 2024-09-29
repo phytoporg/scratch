@@ -14,6 +14,9 @@ typedef u32 HPOINTLIGHT;
 #define LIGHT_VERT_SHADER_PATH "lightvert.glsl"
 #define LIGHT_FRAG_SHADER_PATH "lightfrag.glsl"
 
+#define FWD_VERT_SHADER_PATH "fwdvert.glsl"
+#define FWD_FRAG_SHADER_PATH "fwdfrag.glsl"
+
 #define MAX_POINT_LIGHTS 32
 
 typedef struct
@@ -30,6 +33,10 @@ typedef struct {
 
     HSHADER GeometryProgram;
     HSHADER LightProgram;
+    HSHADER ForwardProgram;
+
+    Matrix44f Projection;
+    Matrix44f View;
 
     PointLight_t PointLights[MAX_POINT_LIGHTS];
     u32 PointLightCount;
@@ -219,6 +226,17 @@ bool DR_UseShader(HSHADER shaderHandle)
     return true;
 }
 
+// State matrices
+void DR_SetProjection(RenderContext_t* pContext, Matrix44f* pProj)
+{
+    pContext->Projection = *pProj;
+}
+
+void DR_SetView(RenderContext_t* pContext, Matrix44f* pView)
+{
+    pContext->View = *pView;
+}
+
 // Shader parameters
 void DR_SetShaderParameteri(HSHADER shaderHandle, char* pName, u32 value)
 {
@@ -249,7 +267,8 @@ bool DR_IsContextValid(RenderContext_t* pContext)
         pContext->NormalBuffer &&
         pContext->AlbedoSpecBuffer &&
         pContext->GeometryProgram != INVALID_SHADER_HANDLE &&
-        pContext->LightProgram != INVALID_SHADER_HANDLE;
+        pContext->LightProgram != INVALID_SHADER_HANDLE &&
+        pContext->ForwardProgram != INVALID_SHADER_HANDLE;
 }
 
 bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
@@ -264,6 +283,7 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
     memset(pContext, 0, sizeof(*pContext));
     pContext->GeometryProgram = INVALID_SHADER_HANDLE;
     pContext->LightProgram = INVALID_SHADER_HANDLE;
+    pContext->ForwardProgram = INVALID_SHADER_HANDLE;
 
     // Create and bind the g buffer
     glGenFramebuffers(1, &pContext->GBuffer);
@@ -283,20 +303,30 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, pContext->PositionBuffer, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, pContext->NormalBuffer, 0);
 
     // Color/specular component buffer (albedo)
     // Note the use of 8-bit precision
     glGenTextures(1, &pContext->AlbedoSpecBuffer);
     glBindTexture(GL_TEXTURE_2D, pContext->AlbedoSpecBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, pContext->PositionBuffer, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, pContext->AlbedoSpecBuffer, 0);
 
     // Tell OpenGL which buffers we'll be using to draw for the bound frame buffer
     u32 attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
     glDrawBuffers(3, attachments);
+
+    u32 rboDepth;
+    glGenRenderbuffers(1, &rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+
+    assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, pContext->GBuffer);
 
     // Get and compile shaders
     char vertText[2048] = {};
@@ -328,6 +358,21 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
 
     pContext->LightProgram = DR_CreateShader(vertText, fragText);
     assert(pContext->LightProgram != INVALID_SHADER_HANDLE);
+
+    memset(vertText, 0, sizeof(vertText));
+    memset(fragText, 0, sizeof(fragText));
+    if (!_DR_ReadText(pAssetRoot, FWD_VERT_SHADER_PATH, vertText, sizeof(vertText)))
+    {
+        return false;
+    }
+
+    if (!_DR_ReadText(pAssetRoot, FWD_FRAG_SHADER_PATH, fragText, sizeof(fragText)))
+    {
+        return false;
+    }
+
+    pContext->ForwardProgram = DR_CreateShader(vertText, fragText);
+    assert(pContext->ForwardProgram != INVALID_SHADER_HANDLE);
 
     // Set up screen quad geometry
 	static const float QuadVertices[] = {
@@ -401,7 +446,7 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
 	glBindBuffer(GL_ARRAY_BUFFER, pContext->CubeVBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(CubeVertices), CubeVertices, GL_STATIC_DRAW);
 	// link vertex attributes
-	glBindVertexArray(pContext->CubeVBO);
+	glBindVertexArray(pContext->CubeVAO);
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
@@ -410,6 +455,8 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
 	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
+
+    glEnable(GL_DEPTH_TEST);
 
     return true;
 }
@@ -427,6 +474,14 @@ void DR_BeginFrame(RenderContext_t* pContext)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     DR_UseShader(pContext->GeometryProgram);
+    DR_SetShaderParameterMat4(
+        pContext->GeometryProgram,
+        "projection",
+        &pContext->Projection);
+    DR_SetShaderParameterMat4(
+        pContext->GeometryProgram,
+        "view",
+        &pContext->View);
 }
 
 void DR_EndFrame(RenderContext_t* pContext)
@@ -442,6 +497,10 @@ void DR_EndFrame(RenderContext_t* pContext)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     DR_UseShader(pContext->LightProgram);
+
+    DR_SetShaderParameteri(pContext->LightProgram, "gPosition", 0);
+    DR_SetShaderParameteri(pContext->LightProgram, "gNormal", 1);
+    DR_SetShaderParameteri(pContext->LightProgram, "gAlbedoSpec", 2);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, pContext->PositionBuffer);

@@ -6,10 +6,9 @@
 static bool g_isRunning = true;
 SDL_Window* g_pWindow = NULL;
 RenderContext_t g_RenderContext;
-Matrix44f g_ProjectionMatrix;
-Matrix44f g_ViewMatrix;
 
-Vector3f g_CubePosition = { 0.0f, 0.0f, -4.0f };
+Vector3f g_CubePosition1 = { 0.2f, 0.0f, 5.0f };
+Vector3f g_CubePosition2 = { -0.2f, 0.0f, 10.0f };
 
 void mainloop()
 {
@@ -25,19 +24,20 @@ void mainloop()
 	}
 
     DR_BeginFrame(&g_RenderContext);
-    DR_SetShaderParameterMat4(
-        g_RenderContext.GeometryProgram,
-        "projection",
-        &g_ProjectionMatrix);
-    DR_SetShaderParameterMat4(
-        g_RenderContext.GeometryProgram,
-        "view",
-        &g_ViewMatrix);
 
     // Draw the cube
     Matrix44f modelMatrix;
+
+    Vector3f scale = { 0.25, 0.25, 0.25 };
     Math_Matrix44f_Identity(&modelMatrix);
-    Math_Matrix44f_Translate(&modelMatrix, &g_CubePosition);
+    Math_Matrix44f_Translate(&modelMatrix, &g_CubePosition1);
+    Math_Matrix44f_Scale(&modelMatrix, &scale);
+    DR_SetShaderParameterMat4(g_RenderContext.GeometryProgram, "model", &modelMatrix);
+    DR_RenderCube(&g_RenderContext);
+
+    Math_Matrix44f_Identity(&modelMatrix);
+    Math_Matrix44f_Translate(&modelMatrix, &g_CubePosition2);
+    Math_Matrix44f_Scale(&modelMatrix, &scale);
     DR_SetShaderParameterMat4(g_RenderContext.GeometryProgram, "model", &modelMatrix);
     DR_RenderCube(&g_RenderContext);
 
@@ -66,6 +66,9 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GLContext GLContext = SDL_GL_CreateContext(g_pWindow);
     char* pAssetRoot = argc > 1 ? argv[1] : ".";
     if (!DR_Initialize(&g_RenderContext, pAssetRoot))
@@ -75,16 +78,25 @@ int main(int argc, char** argv)
     }
 
     // Set up view, projection matrices
+    Matrix44f projectionMatrix;
+    Matrix44f viewMatrix;
     const float Angle = 45.0f;
     const float Ratio = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
     const float Near = 0.1f;
     const float Far = 100.0f;
-    Math_Matrix44f_Perspective(&g_ProjectionMatrix, Angle, Ratio, Near, Far);
+    Math_Matrix44f_Perspective(
+        &projectionMatrix,
+        Math_ToRadians(Angle),
+        Ratio, Near,
+        Far);
 
     Vector3f cameraPosition = { 0.f, 0.f,  0.f };
     Vector3f cameraLook     = { 0.f, 0.f, -1.f };
     Vector3f cameraUp       = { 0.f, 1.f,  0.f };
-    Math_Matrix44f_LookAt(&cameraPosition, &cameraLook, &cameraUp, &g_ViewMatrix);
+    Math_Matrix44f_LookAt(&cameraPosition, &cameraLook, &cameraUp, &viewMatrix);
+
+    DR_SetProjection(&g_RenderContext, &projectionMatrix);
+    DR_SetView(&g_RenderContext, &viewMatrix);
 
     // Lighting -- one light behind the camera
     PointLight_t pointLight = {

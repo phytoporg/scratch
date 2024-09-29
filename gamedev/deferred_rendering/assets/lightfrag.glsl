@@ -13,7 +13,7 @@ struct Light
     vec3 Color;
 };
 
-const int LIGHT_COUNT = 32;
+const int LIGHT_COUNT = 1;
 uniform Light lights[LIGHT_COUNT];
 uniform vec3 viewPos;
 

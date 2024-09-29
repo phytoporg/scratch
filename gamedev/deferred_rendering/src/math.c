@@ -1,5 +1,7 @@
 #include "common.h"
 
+#define PI 3.141592636
+
 // Note: matrix convention is row-major, to be in line with glm
 typedef struct
 {
@@ -37,6 +39,12 @@ typedef struct
         float data[3];
     };
 } Vector3f;
+
+// General
+float Math_ToRadians(float degrees)
+{
+    return degrees * (PI / 180.f);
+}
 
 // Vector2f
 void Math_Vector2f_Zero(Vector2f* pV)
@@ -111,9 +119,9 @@ void Math_Matrix44f_Identity(Matrix44f* pM)
 
 void Math_Matrix44f_Translate(Matrix44f* pM, Vector3f* pV)
 {
-    pM->m[0][2] += pV->x;
-    pM->m[1][2] += pV->y;
-    pM->m[2][2] += pV->z;
+    pM->m[3][0] += pV->x;
+    pM->m[3][1] += pV->y;
+    pM->m[3][2] += pV->z;
 }
 
 void Math_Matrix44f_Scale(Matrix44f* pM, Vector3f* pV)
@@ -123,50 +131,53 @@ void Math_Matrix44f_Scale(Matrix44f* pM, Vector3f* pV)
     pM->m[2][2] *= pV->z;
 }
 
-// Yoinked from https://stackoverflow.com/questions/8115352/glmperspective-explanation
+// Yoinked from cglm
 void Math_Matrix44f_Perspective(Matrix44f* pM, float angle, float ratio, float near, float far)
 {
+    float f, fn;
+
     Math_Matrix44f_Zero(pM);
 
-    float tanHalfAngle = tan(angle / 2.f);
-    pM->m[0][0] = 1.f / (ratio * tanHalfAngle);
-    pM->m[1][1] = 1.f / (tanHalfAngle);
-    pM->m[2][2] = -(far + near) / (far - near);
+    f  = 1.0f / tanf(angle * 0.5f);
+    fn = 1.0f / (near - far);
+
+    pM->m[0][0] = f / ratio;
+    pM->m[1][1] = f;
+    pM->m[2][2] = (near + far) * fn;
     pM->m[3][2] = -1.f;
-    pM->m[2][3] = -(2.f * far * near) / (far - near);
+    pM->m[2][3] = 2.0f * near * far * fn;
 }
 
-// Yoinked from https://stackoverflow.com/questions/21830340/understanding-glmlookat
+// Yoinked from cglm
 void Math_Matrix44f_LookAt(Vector3f* pEye, Vector3f* pCenter, Vector3f* pUp, Matrix44f* pLookAt)
 {
-    Vector3f X, Y, Z;
+    Vector3f f, u, s;
 
-    Math_Vector3f_Subtract(pEye, pCenter, &Z);
-    Y = *pUp;
-    Math_Vector3f_Cross(&Y, &Z, &X);
+    Math_Vector3f_Subtract(pCenter, pEye, &f);
+    Math_Vector3f_Normalize(&f);
 
-    Math_Vector3f_Normalize(&X);
-    Math_Vector3f_Normalize(&Y);
-    Math_Vector3f_Normalize(&Z);
+	// glm_vec3_crossn(up, f, s);
+	Math_Vector3f_Cross(pUp, &f, &s);
+    Math_Vector3f_Normalize(&f);
 
-    const float XDotEye = Math_Vector3f_Dot(&X, pEye);
-    const float YDotEye = Math_Vector3f_Dot(&Y, pEye);
-    const float ZDotEye = Math_Vector3f_Dot(&Z, pEye);
+    Math_Vector3f_Cross(&f, &s, &u);
+	
+    const float SEye = Math_Vector3f_Dot(&s, pEye);
+    const float UEye = Math_Vector3f_Dot(&u, pEye);
+    const float FEye = Math_Vector3f_Dot(&f, pEye);
 
-    pLookAt->m[0][0] = X.x;
-    pLookAt->m[1][0] = X.y;
-    pLookAt->m[2][0] = X.z;
-    pLookAt->m[3][0] = -XDotEye;
-    pLookAt->m[0][1] = Y.x;
-    pLookAt->m[1][1] = Y.y;
-    pLookAt->m[2][1] = Y.z;
-    pLookAt->m[3][1] = -YDotEye;
-    pLookAt->m[0][2] = Z.x;
-    pLookAt->m[1][2] = Z.y;
-    pLookAt->m[2][2] = Z.z;
-    pLookAt->m[3][2] = -ZDotEye;
-    pLookAt->m[0][3] = 0;
-    pLookAt->m[1][3] = 0;
-    pLookAt->m[2][3] = 0;
+    pLookAt->m[0][0] = s.x;
+    pLookAt->m[0][1] = u.x;
+    pLookAt->m[0][2] = f.x;
+    pLookAt->m[1][0] = s.y;
+    pLookAt->m[1][1] = u.y;
+    pLookAt->m[1][2] = f.y;
+    pLookAt->m[2][0] = s.z;
+    pLookAt->m[2][1] = u.z;
+    pLookAt->m[2][2] = f.z;
+    pLookAt->m[3][0] = -SEye;
+    pLookAt->m[3][1] = -UEye;
+    pLookAt->m[3][2] = -FEye;
+    pLookAt->m[0][3] = pLookAt->m[1][3] = pLookAt->m[2][3] = 0.0f;
     pLookAt->m[3][3] = 1.0f;
 }
