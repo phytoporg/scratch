@@ -3,13 +3,24 @@
 #include "common.h"
 
 typedef u32 HSHADER;
+typedef u32 HPOINTLIGHT;
 
 #define INVALID_SHADER_HANDLE 0xFFFFFFFF
+#define INVALID_POINTLIGHT_HANDLE 0xFFFFFFFF
+
 #define BUFFER_VERT_SHADER_PATH "vert.glsl"
 #define BUFFER_FRAG_SHADER_PATH "frag.glsl"
 
 #define LIGHT_VERT_SHADER_PATH "lightvert.glsl"
 #define LIGHT_FRAG_SHADER_PATH "lightfrag.glsl"
+
+#define MAX_POINT_LIGHTS 32
+
+typedef struct
+{
+    Vector3f Position;
+    Vector3f Color;
+} PointLight_t;
 
 typedef struct {
     u32 GBuffer;
@@ -19,6 +30,15 @@ typedef struct {
 
     HSHADER GeometryProgram;
     HSHADER LightProgram;
+
+    PointLight_t PointLights[MAX_POINT_LIGHTS];
+    u32 PointLightCount;
+
+    u32 ScreenQuadVAO;
+    u32 ScreenQuadVBO;
+
+    u32 CubeVAO;
+    u32 CubeVBO;
 } RenderContext_t;
 
 // DR = Deferred Renderer
@@ -153,6 +173,41 @@ fail:
     return INVALID_SHADER_HANDLE;
 }
 
+HPOINTLIGHT DR_CreatePointLight(RenderContext_t* pContext, PointLight_t* pLight) 
+{
+    if (!pLight || !pContext || pContext->PointLightCount >= MAX_POINT_LIGHTS)
+    {
+        return INVALID_POINTLIGHT_HANDLE;
+    }
+
+    PointLight_t* pNext = &pContext->PointLights[pContext->PointLightCount];
+    *pNext = *pLight;
+
+    HPOINTLIGHT lightHandle = pContext->PointLightCount;
+    pContext->PointLightCount++;
+
+    return lightHandle;
+}
+
+PointLight_t* DR_GetPointLight(RenderContext_t* pContext, HPOINTLIGHT lightHandle)
+{
+    if (lightHandle == INVALID_POINTLIGHT_HANDLE || !pContext)
+    {
+        return NULL;
+    }
+
+    const u32 Index = lightHandle;
+    if (Index >= MAX_POINT_LIGHTS || Index >= pContext->PointLightCount)
+    {
+        return NULL;
+    }
+
+    return &pContext->PointLights[Index];
+}
+
+// TODO:
+// DR_DestroyPointLight
+
 bool DR_UseShader(HSHADER shaderHandle)
 {
     if (shaderHandle == INVALID_SHADER_HANDLE)
@@ -164,9 +219,20 @@ bool DR_UseShader(HSHADER shaderHandle)
     return true;
 }
 
+// Shader parameters
 void DR_SetShaderParameteri(HSHADER shaderHandle, char* pName, u32 value)
 {
     glUniform1i(glGetUniformLocation(shaderHandle, pName), value);
+}
+
+void DR_SetShaderParameterMat4(HSHADER shaderHandle, char* pName, Matrix44f* pMat)
+{
+    glUniformMatrix4fv(glGetUniformLocation(shaderHandle, pName), 1, GL_FALSE, &pMat->m[0][0]);
+}
+
+void DR_SetShaderParameterVec3(HSHADER shaderHandle, char* pName, Vector3f* pVec)
+{
+    glUniformMatrix3fv(glGetUniformLocation(shaderHandle, pName), 1, GL_FALSE, &pVec->data[0]);
 }
 
 bool DR_IsContextValid(RenderContext_t* pContext)
@@ -263,6 +329,88 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
     pContext->LightProgram = DR_CreateShader(vertText, fragText);
     assert(pContext->LightProgram != INVALID_SHADER_HANDLE);
 
+    // Set up screen quad geometry
+	static const float QuadVertices[] = {
+		// positions        // texture Coords
+		-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+		 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+		 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+	};
+
+	glGenVertexArrays(1, &pContext->ScreenQuadVAO);
+	glGenBuffers(1, &pContext->ScreenQuadVBO);
+	glBindVertexArray(pContext->ScreenQuadVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, pContext->ScreenQuadVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(QuadVertices), &QuadVertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	glBindVertexArray(0);
+
+    // Set up cube geometry
+	static const float CubeVertices[] = {
+		// back face
+		-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+		 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+		 1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
+		 1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
+		-1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+		-1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
+		// front face
+		-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+		 1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
+		 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+		 1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
+		-1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
+		-1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
+		// left face
+		-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+		-1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
+		-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+		-1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
+		-1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+		-1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
+		// right face
+		 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+		 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+		 1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
+		 1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
+		 1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
+		 1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
+		// bottom face
+		-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+		 1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
+		 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+		 1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
+		-1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
+		-1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
+		// top face
+		-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+		 1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+		 1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
+		 1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
+		-1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
+		-1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+	};
+
+	glGenVertexArrays(1, &pContext->CubeVAO);
+	glGenBuffers(1, &pContext->CubeVBO);
+	// fill buffer
+	glBindBuffer(GL_ARRAY_BUFFER, pContext->CubeVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(CubeVertices), CubeVertices, GL_STATIC_DRAW);
+	// link vertex attributes
+	glBindVertexArray(pContext->CubeVBO);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
     return true;
 }
 
@@ -279,13 +427,6 @@ void DR_BeginFrame(RenderContext_t* pContext)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     DR_UseShader(pContext->GeometryProgram);
-
-    // TODO: all this biz
-    // DR_SetShaderParameterm4(pContext->GeometryProgram, "projection", projectionMatrix);
-    // DR_SetShaderParameterm4(pContext->GeometryProgram, "view", viewMatrix);
-
-    // DO PER OBJECT (not here):
-    // DR_SetShaderParameterm4(pContext->GeometryProgram, "model", modelMatrix);
 }
 
 void DR_EndFrame(RenderContext_t* pContext)
@@ -298,8 +439,10 @@ void DR_EndFrame(RenderContext_t* pContext)
 
     // Perform the lighting pass
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    DR_UseShader(pContext->LightProgram);
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, pContext->PositionBuffer);
     glActiveTexture(GL_TEXTURE1);
@@ -307,8 +450,38 @@ void DR_EndFrame(RenderContext_t* pContext)
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, pContext->AlbedoSpecBuffer);
 
-    // TODO: bind lighting pass shader
-    // TODO: bind all g buffer textures
-    // TODO: set all lighting uniform vars
-    // TODO: render the screen quad
+    for (u32 i = 0; i < pContext->PointLightCount; ++i)
+    {
+        PointLight_t* pLight = &pContext->PointLights[i];
+
+        char positionParamName[256];
+        sprintf(positionParamName, "lights[%d].Position", i);
+        DR_SetShaderParameterVec3(
+            pContext->LightProgram,
+            positionParamName,
+            &pLight->Position);
+
+        char colorParamName[256];
+        sprintf(colorParamName, "lights[%d].Color", i);
+        DR_SetShaderParameterVec3(
+            pContext->LightProgram,
+            colorParamName,
+            &pLight->Color);
+    }
+
+    Vector3f cameraPosition;
+    Math_Vector3f_Zero(&cameraPosition);
+    DR_SetShaderParameterVec3(pContext->LightProgram, "viewPos", &cameraPosition);
+
+    // Render the screen quad
+    glBindVertexArray(pContext->ScreenQuadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+void DR_RenderCube(RenderContext_t* pContext)
+{
+    glBindVertexArray(pContext->CubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
 }
