@@ -1,5 +1,8 @@
-- Implement a linear algebra library lol, not gonna use glm
-- Clean up some names to make geometry and lighting passes clearer
+- Fix light uniform values
+- Add rotation matrix support, make the cubes rotate around z axis
+- Diffuse texture support for the cubes (just skip specular r/n)
 
 - Get emscripten build working
 - Put some thought into actual next steps and populate this TODO some more!
+
+- Call it, move onto isometric grid rendering experiments

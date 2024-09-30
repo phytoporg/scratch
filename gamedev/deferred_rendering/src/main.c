@@ -7,8 +7,12 @@ static bool g_isRunning = true;
 SDL_Window* g_pWindow = NULL;
 RenderContext_t g_RenderContext;
 
-Vector3f g_CubePosition1 = { 0.2f, 0.0f, 5.0f };
-Vector3f g_CubePosition2 = { -0.2f, 0.0f, 10.0f };
+Vector3f g_CubePositions[4] = {
+    {  1.25,  0.0f, 4.0f },
+    { -1.25,  0.0f, 4.0f },
+    {     0,  1.25, 4.0f },
+    {     0, -1.25, 4.0f },
+};
 
 void mainloop()
 {
@@ -28,18 +32,16 @@ void mainloop()
     // Draw the cube
     Matrix44f modelMatrix;
 
+    const u32 NumCubes = sizeof(g_CubePositions) / sizeof(g_CubePositions[0]);
     Vector3f scale = { 0.25, 0.25, 0.25 };
-    Math_Matrix44f_Identity(&modelMatrix);
-    Math_Matrix44f_Translate(&modelMatrix, &g_CubePosition1);
-    Math_Matrix44f_Scale(&modelMatrix, &scale);
-    DR_SetShaderParameterMat4(g_RenderContext.GeometryProgram, "model", &modelMatrix);
-    DR_RenderCube(&g_RenderContext);
-
-    Math_Matrix44f_Identity(&modelMatrix);
-    Math_Matrix44f_Translate(&modelMatrix, &g_CubePosition2);
-    Math_Matrix44f_Scale(&modelMatrix, &scale);
-    DR_SetShaderParameterMat4(g_RenderContext.GeometryProgram, "model", &modelMatrix);
-    DR_RenderCube(&g_RenderContext);
+    for (u32 i = 0; i < NumCubes; ++i)
+    {
+        Math_Matrix44f_Identity(&modelMatrix);
+        Math_Matrix44f_Translate(&modelMatrix, &g_CubePositions[i]);
+        Math_Matrix44f_Scale(&modelMatrix, &scale);
+        DR_SetShaderParameterMat4(g_RenderContext.GeometryProgram, "model", &modelMatrix);
+        DR_RenderCube(&g_RenderContext);
+    }
 
     DR_EndFrame(&g_RenderContext);
 
@@ -100,7 +102,7 @@ int main(int argc, char** argv)
 
     // Lighting -- one light behind the camera
     PointLight_t pointLight = {
-        .Position = { 0.f, 0.f, -2.0f },
+        .Position = { 0.f, 0.f, 4.0f },
         .Color = { 1.0f, 1.0f, 1.0f }
     };
     DR_CreatePointLight(&g_RenderContext, &pointLight);

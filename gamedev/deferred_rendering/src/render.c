@@ -68,7 +68,7 @@ bool _DR_ReadText(char* pAssetRoot, const char* pFilePath, char* pText, u32 maxL
         fprintf(
             stderr,
             "Failed to open buffer vert shader file %s (%s)\n",
-            BUFFER_VERT_SHADER_PATH,
+            pFilePath,
             strerror(errno));
         return false;
     }
@@ -250,7 +250,7 @@ void DR_SetShaderParameterMat4(HSHADER shaderHandle, char* pName, Matrix44f* pMa
 
 void DR_SetShaderParameterVec3(HSHADER shaderHandle, char* pName, Vector3f* pVec)
 {
-    glUniformMatrix3fv(glGetUniformLocation(shaderHandle, pName), 1, GL_FALSE, &pVec->data[0]);
+    glUniform3fv(glGetUniformLocation(shaderHandle, pName), 1, &pVec->data[0]);
 }
 
 bool DR_IsContextValid(RenderContext_t* pContext)
@@ -509,18 +509,22 @@ void DR_EndFrame(RenderContext_t* pContext)
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, pContext->AlbedoSpecBuffer);
 
+    DR_SetShaderParameteri(
+        pContext->LightProgram,
+        "lightCount",
+        pContext->PointLightCount);
     for (u32 i = 0; i < pContext->PointLightCount; ++i)
     {
         PointLight_t* pLight = &pContext->PointLights[i];
 
-        char positionParamName[256];
+        char positionParamName[256] = {};
         sprintf(positionParamName, "lights[%d].Position", i);
         DR_SetShaderParameterVec3(
             pContext->LightProgram,
             positionParamName,
             &pLight->Position);
 
-        char colorParamName[256];
+        char colorParamName[256] = {};
         sprintf(colorParamName, "lights[%d].Color", i);
         DR_SetShaderParameterVec3(
             pContext->LightProgram,
@@ -528,6 +532,7 @@ void DR_EndFrame(RenderContext_t* pContext)
             &pLight->Color);
     }
 
+    // Hardcode the camera at (0, 0, 0) for the time being
     Vector3f cameraPosition;
     Math_Vector3f_Zero(&cameraPosition);
     DR_SetShaderParameterVec3(pContext->LightProgram, "viewPos", &cameraPosition);

@@ -20,8 +20,13 @@ void main()
 
     // Diffuse color in rgb components
     // gAlbedoSpec.rgb = texture(texture_diffuse1, TexCoords).rgb;
-    gAlbedoSpec.rgba = vec4(1.0, 1.0, 1.0, 1.0);
+
+    // TODO: not using textures yet, hardcode to red in the meantime
+    gAlbedoSpec.rgb = vec3(1.0, 0.0, 0.0);
 
     // Specular value in alpha component
     // gAlbedoSpec.a = texture(texture_specular1, TexCoords).r;
+
+    // TODO: same as above, hardcode specular to 0.0 for now
+    gAlbedoSpec.a = 0.0;
 }

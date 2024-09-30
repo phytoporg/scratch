@@ -144,8 +144,8 @@ void Math_Matrix44f_Perspective(Matrix44f* pM, float angle, float ratio, float n
     pM->m[0][0] = f / ratio;
     pM->m[1][1] = f;
     pM->m[2][2] = (near + far) * fn;
-    pM->m[3][2] = -1.f;
-    pM->m[2][3] = 2.0f * near * far * fn;
+    pM->m[2][3] = -1.f;
+    pM->m[3][2] = 2.0f * near * far * fn;
 }
 
 // Yoinked from cglm
