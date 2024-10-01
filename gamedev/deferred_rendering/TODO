@@ -1,4 +1,3 @@
-- Fix light uniform values
 - Add rotation matrix support, make the cubes rotate around z axis
 - Diffuse texture support for the cubes (just skip specular r/n)
 
