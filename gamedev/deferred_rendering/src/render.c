@@ -250,6 +250,7 @@ void DR_SetShaderParameterMat4(HSHADER shaderHandle, char* pName, Matrix44f* pMa
 
 void DR_SetShaderParameterVec3(HSHADER shaderHandle, char* pName, Vector3f* pVec)
 {
+    const GLint loc = glGetUniformLocation(shaderHandle, pName);
     glUniform3fv(glGetUniformLocation(shaderHandle, pName), 1, &pVec->data[0]);
 }
 
@@ -511,32 +512,27 @@ void DR_EndFrame(RenderContext_t* pContext)
 
     DR_SetShaderParameteri(
         pContext->LightProgram,
-        "lightCount",
+        "numLights",
         pContext->PointLightCount);
     for (u32 i = 0; i < pContext->PointLightCount; ++i)
     {
         PointLight_t* pLight = &pContext->PointLights[i];
 
         char positionParamName[256] = {};
-        sprintf(positionParamName, "lights[%d].Position", i);
+        sprintf(positionParamName, "lights[%u].Position", i);
         DR_SetShaderParameterVec3(
             pContext->LightProgram,
             positionParamName,
             &pLight->Position);
 
         char colorParamName[256] = {};
-        sprintf(colorParamName, "lights[%d].Color", i);
+        sprintf(colorParamName, "lights[%u].Color", i);
         DR_SetShaderParameterVec3(
             pContext->LightProgram,
             colorParamName,
             &pLight->Color);
     }
-
-    // Hardcode the camera at (0, 0, 0) for the time being
-    Vector3f cameraPosition;
-    Math_Vector3f_Zero(&cameraPosition);
-    DR_SetShaderParameterVec3(pContext->LightProgram, "viewPos", &cameraPosition);
-
+    
     // Render the screen quad
     glBindVertexArray(pContext->ScreenQuadVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
