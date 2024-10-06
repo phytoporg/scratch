@@ -149,6 +149,26 @@ void Math_Matrix44f_Perspective(Matrix44f* pM, float angle, float ratio, float n
 }
 
 // Yoinked from cglm
+void Math_Matrix44f_Ortho(Matrix44f* pM, float left, float right, float bottom, float top, float near, float far)
+{
+	float rl, tb, fn;
+
+	Math_Matrix44f_Zero(pM);
+
+	rl = 1.0f / (right  - left);
+	tb = 1.0f / (top    - bottom);
+	fn =-1.0f / (far - near);
+
+	pM->m[0][0] = 2.0f * rl;
+	pM->m[1][1] = 2.0f * tb;
+	pM->m[2][2] = 2.0f * fn;
+	pM->m[3][0] =-(right  + left)    * rl;
+	pM->m[3][1] =-(top    + bottom)  * tb;
+	pM->m[3][2] = (far + near) * fn;
+	pM->m[3][3] = 1.0f;
+}
+
+// Yoinked from cglm
 void Math_Matrix44f_LookAt(Vector3f* pEye, Vector3f* pCenter, Vector3f* pUp, Matrix44f* pLookAt)
 {
     Vector3f f, u, s;

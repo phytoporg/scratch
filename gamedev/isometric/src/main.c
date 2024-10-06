@@ -7,13 +7,6 @@ static bool g_isRunning = true;
 SDL_Window* g_pWindow = NULL;
 RenderContext_t g_RenderContext;
 
-Vector3f g_CubePositions[4] = {
-    {  1.25,  0.0f, 4.0f },
-    { -1.25,  0.0f, 4.0f },
-    {     0,  1.25, 4.0f },
-    {     0, -1.25, 4.0f },
-};
-
 void mainloop()
 {
 	SDL_Event evt;
@@ -29,20 +22,15 @@ void mainloop()
 
     DR_BeginFrame(&g_RenderContext);
 
-    // Draw the cube
-    Matrix44f modelMatrix;
+    const int TileIndex = 0;
+    DR_DrawTile(&g_RenderContext, 0.f, 0.f, TileIndex);
+    DR_DrawTile(&g_RenderContext, 1.f, 0.f, TileIndex);
+    DR_DrawTile(&g_RenderContext, 2.f, 0.f, TileIndex);
 
-    const u32 NumCubes = sizeof(g_CubePositions) / sizeof(g_CubePositions[0]);
-    Vector3f scale = { 0.25, 0.25, 0.25 };
-    for (u32 i = 0; i < NumCubes; ++i)
-    {
-        Math_Matrix44f_Identity(&modelMatrix);
-        Math_Matrix44f_Translate(&modelMatrix, &g_CubePositions[i]);
-        Math_Matrix44f_Scale(&modelMatrix, &scale);
-        DR_SetShaderParameterMat4(g_RenderContext.GeometryProgram, "model", &modelMatrix);
-        DR_RenderCube(&g_RenderContext);
-    }
-
+    DR_DrawTile(&g_RenderContext, 0.f, 1.f, TileIndex);
+    DR_DrawTile(&g_RenderContext, 1.f, 1.f, TileIndex);
+    DR_DrawTile(&g_RenderContext, 2.f, 1.f, TileIndex);
+    
     DR_EndFrame(&g_RenderContext);
 
 	SDL_GL_SwapWindow(g_pWindow);
@@ -82,15 +70,17 @@ int main(int argc, char** argv)
     // Set up view, projection matrices
     Matrix44f projectionMatrix;
     Matrix44f viewMatrix;
-    const float Angle = 45.0f;
-    const float Ratio = (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT;
+    const float Left = 0.0f;
+    const float Right = (float)SCREEN_WIDTH;
+    const float Bottom = 0.0f;
+    const float Top = (float)SCREEN_HEIGHT;
     const float Near = 0.1f;
     const float Far = 100.0f;
-    Math_Matrix44f_Perspective(
+    Math_Matrix44f_Ortho(
         &projectionMatrix,
-        Math_ToRadians(Angle),
-        Ratio, Near,
-        Far);
+        Left, Right,
+        Bottom, Top,
+        Near, Far);	
 
     Vector3f cameraPosition = { 0.f, 0.f,  0.f };
     Vector3f cameraLook     = { 0.f, 0.f, -1.f };
@@ -99,13 +89,6 @@ int main(int argc, char** argv)
 
     DR_SetProjection(&g_RenderContext, &projectionMatrix);
     DR_SetView(&g_RenderContext, &viewMatrix);
-
-    // Lighting -- one light behind the camera
-    PointLight_t pointLight = {
-        .Position = { 0.f, 0.f, 4.0f },
-        .Color = { 1.0f, 1.0f, 1.0f }
-    };
-    DR_CreatePointLight(&g_RenderContext, &pointLight);
 
     while(g_isRunning)
     {

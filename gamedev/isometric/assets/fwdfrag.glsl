@@ -1,9 +1,12 @@
 #version 330 core
 layout (location = 0) out vec4 FragColor;
 
-uniform vec3 lightColor;
+in vec3 FragPos;
+in vec2 TexCoords;
+
+uniform sampler2D diffuse_texture;
 
 void main()
 {           
-    FragColor = vec4(lightColor, 1.0);
+    FragColor = texture(diffuse_texture, TexCoords);
 }

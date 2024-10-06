@@ -1,6 +1,4 @@
-- Set up basic template to render stuff
-- Support for ortho projection
-- Load tilemap texture
+- Fix DR_DrawTile() transforms for isometric tiling
 - Load tilemap csv files
 - Render single-layer tilemap
 - Render multi-layer tilemaps

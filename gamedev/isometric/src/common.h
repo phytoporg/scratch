@@ -22,6 +22,7 @@ typedef int32_t  s32;
 #include <GL/glext.h>
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <SDL2/SDL_opengl.h>
 
 #define SCREEN_WIDTH 640

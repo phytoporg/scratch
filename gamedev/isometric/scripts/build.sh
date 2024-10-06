@@ -3,7 +3,7 @@
 if [[ -z "${BUILD_EMSCRIPTEN}" ]]; then
     rm -rf build
     mkdir build
-    gcc -o build/isometric src/main.c `sdl2-config --cflags --libs` -lGL -lm
+    gcc -o build/isometric src/main.c `sdl2-config --cflags --libs` -lSDL2_image -lGL -lm
 else
     >&2 echo emscripten build not yet supported
     # rm -rf embuild
