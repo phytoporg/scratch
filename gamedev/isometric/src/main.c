@@ -71,9 +71,9 @@ int main(int argc, char** argv)
     Matrix44f projectionMatrix;
     Matrix44f viewMatrix;
     const float Left = 0.0f;
-    const float Right = (float)SCREEN_WIDTH;
+    const float Right = (float)SCREEN_WIDTH / 2.f;
     const float Bottom = 0.0f;
-    const float Top = (float)SCREEN_HEIGHT;
+    const float Top = (float)SCREEN_HEIGHT / 2.f;
     const float Near = 0.1f;
     const float Far = 100.0f;
     Math_Matrix44f_Ortho(
@@ -82,9 +82,9 @@ int main(int argc, char** argv)
         Bottom, Top,
         Near, Far);	
 
-    Vector3f cameraPosition = { 0.f, 0.f,  0.f };
-    Vector3f cameraLook     = { 0.f, 0.f, -1.f };
-    Vector3f cameraUp       = { 0.f, 1.f,  0.f };
+    Vector3f cameraPosition = { 0.f, 0.f, 0.f };
+    Vector3f cameraLook     = { 0.f, 0.f, 1.f };
+    Vector3f cameraUp       = { 0.f, 1.f, 0.f };
     Math_Matrix44f_LookAt(&cameraPosition, &cameraLook, &cameraUp, &viewMatrix);
 
     DR_SetProjection(&g_RenderContext, &projectionMatrix);

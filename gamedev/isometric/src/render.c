@@ -336,18 +336,17 @@ void DR_DrawTile(RenderContext_t* pContext, float x, float y, int tileIndex)
     Matrix44f modelMatrix;
     Math_Matrix44f_Identity(&modelMatrix);
 
-    Vector3f scale = { TILE_WIDTH_PX * 0.5f, TILE_HEIGHT_PX * 0.5f, 1.0f };
+    const float HalfTileWidth = TILE_WIDTH_PX * 0.5f;
+    const float HalfTileHeight = TILE_HEIGHT_PX * 0.5f;
+    Vector3f scale = { HalfTileWidth, HalfTileHeight, 1.0f };
     Math_Matrix44f_Scale(&modelMatrix, &scale);
 
-    // TODO: This shouldn't be necessary, fix this 
-    x = -(x + 1);
-
-    const float xOffset = TILE_WIDTH_PX * 0.5f;
-    const float yOffset = TILE_WIDTH_PX * 0.5f;
+    const float xOffset = HalfTileWidth;
+    const float yOffset = HalfTileHeight;
     Vector3f translation = {
         x * TILE_WIDTH_PX + xOffset,
         y * TILE_HEIGHT_PX + yOffset,
-        0.1f };
+        -0.1f };
     Math_Matrix44f_Translate(&modelMatrix, &translation);
 
     DR_SetShaderParameterMat4(
