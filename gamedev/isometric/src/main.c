@@ -23,14 +23,14 @@ void mainloop()
     DR_BeginFrame(&g_RenderContext);
 
     const int TileIndex = 0;
+    DR_DrawTile(&g_RenderContext, 0.f, 1.f, TileIndex);
+    DR_DrawTile(&g_RenderContext, 1.f, 1.f, TileIndex);
+    DR_DrawTile(&g_RenderContext, 2.f, 1.f, TileIndex);
+
     DR_DrawTile(&g_RenderContext, 0.f, 0.f, TileIndex);
     DR_DrawTile(&g_RenderContext, 1.f, 0.f, TileIndex);
     DR_DrawTile(&g_RenderContext, 2.f, 0.f, TileIndex);
 
-    DR_DrawTile(&g_RenderContext, 0.f, 1.f, TileIndex);
-    DR_DrawTile(&g_RenderContext, 1.f, 1.f, TileIndex);
-    DR_DrawTile(&g_RenderContext, 2.f, 1.f, TileIndex);
-    
     DR_EndFrame(&g_RenderContext);
 
 	SDL_GL_SwapWindow(g_pWindow);
@@ -89,6 +89,12 @@ int main(int argc, char** argv)
 
     DR_SetProjection(&g_RenderContext, &projectionMatrix);
     DR_SetView(&g_RenderContext, &viewMatrix);
+
+    Vector2f tilemapOffset = {
+        .x = Right / 2.f,
+        .y = Top / 2.f
+    };
+    DR_SetTilemapOffset(&g_RenderContext, &tilemapOffset);
 
     while(g_isRunning)
     {

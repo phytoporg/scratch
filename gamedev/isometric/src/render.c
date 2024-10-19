@@ -21,6 +21,7 @@ typedef struct {
     u32 QuadVAO;
     u32 QuadVBO;
 
+    Vector2f TilemapOffset;
     u32 TilemapTexture;
 } RenderContext_t;
 
@@ -203,6 +204,11 @@ void DR_SetView(RenderContext_t* pContext, Matrix44f* pView)
     pContext->View = *pView;
 }
 
+void DR_SetTilemapOffset(RenderContext_t* pContext, Vector2f* pOffset)
+{
+    pContext->TilemapOffset = *pOffset;
+}
+
 // Shader parameters
 void DR_SetShaderParameteri(HSHADER shaderHandle, char* pName, u32 value)
 {
@@ -290,7 +296,10 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
         return false;
     }
 
+    Math_Vector2f_Zero(&pContext->TilemapOffset);
+
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_ALWAYS);
 
     return true;
 }
@@ -304,7 +313,7 @@ void DR_BeginFrame(RenderContext_t* pContext)
     }
 
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -341,11 +350,12 @@ void DR_DrawTile(RenderContext_t* pContext, float x, float y, int tileIndex)
     Vector3f scale = { HalfTileWidth, HalfTileHeight, 1.0f };
     Math_Matrix44f_Scale(&modelMatrix, &scale);
 
-    const float xOffset = HalfTileWidth;
-    const float yOffset = HalfTileHeight;
+    const float xOffset = pContext->TilemapOffset.x;
+    const float yOffset = pContext->TilemapOffset.y;
+
     Vector3f translation = {
-        x * TILE_WIDTH_PX + xOffset,
-        y * TILE_HEIGHT_PX + yOffset,
+        x * HalfTileWidth + xOffset, // TODO: this isn't quite right
+        y * HalfTileHeight - (HalfTileHeight / 2.f * x) + yOffset,
         -0.1f };
     Math_Matrix44f_Translate(&modelMatrix, &translation);
 
