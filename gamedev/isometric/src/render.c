@@ -299,6 +299,8 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
     Math_Vector2f_Zero(&pContext->TilemapOffset);
 
     glEnable(GL_DEPTH_TEST);
+
+    // TODO: may only want this for tilemap rendering
     glDepthFunc(GL_ALWAYS);
 
     return true;
