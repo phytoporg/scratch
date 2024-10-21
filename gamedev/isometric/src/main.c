@@ -1,6 +1,7 @@
 #include "common.h"
 #include "math.c"
 #include "render.c"
+#include "map.c"
 
 // Globals
 static bool g_isRunning = true;
