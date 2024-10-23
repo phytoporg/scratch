@@ -7,6 +7,7 @@
 static bool g_isRunning = true;
 SDL_Window* g_pWindow = NULL;
 RenderContext_t g_RenderContext;
+MapInfo_t g_mapInfo;
 
 void mainloop()
 {
@@ -24,13 +25,16 @@ void mainloop()
     DR_BeginFrame(&g_RenderContext);
 
     const int TileIndex = 0;
-    DR_DrawTile(&g_RenderContext, 0.f, 1.f, TileIndex);
-    DR_DrawTile(&g_RenderContext, 1.f, 1.f, TileIndex);
-    DR_DrawTile(&g_RenderContext, 2.f, 1.f, TileIndex);
-
-    DR_DrawTile(&g_RenderContext, 0.f, 0.f, TileIndex);
-    DR_DrawTile(&g_RenderContext, 1.f, 0.f, TileIndex);
-    DR_DrawTile(&g_RenderContext, 2.f, 0.f, TileIndex);
+    for (int y = g_mapInfo.MapHeight - 1; y >= 0; --y)
+    {
+        for (int x = 0; x < g_mapInfo.MapWidth; ++x)
+        {
+            if(g_mapInfo.Grid[y][x] == 0)
+            {
+                DR_DrawTile(&g_RenderContext, (float)x, (float)y, TileIndex);
+            }
+        }
+    }
 
     DR_EndFrame(&g_RenderContext);
 
@@ -92,10 +96,15 @@ int main(int argc, char** argv)
     DR_SetView(&g_RenderContext, &viewMatrix);
 
     Vector2f tilemapOffset = {
-        .x = Right / 2.f,
+        .x = TILE_WIDTH_PX / 2.f,
         .y = Top / 2.f
     };
     DR_SetTilemapOffset(&g_RenderContext, &tilemapOffset);
+
+    if (!Map_LoadMap("./assets/tilemap.csv", &g_mapInfo))
+    {
+        return -1;
+    }
 
     while(g_isRunning)
     {

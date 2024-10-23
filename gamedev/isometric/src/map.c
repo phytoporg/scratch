@@ -29,11 +29,11 @@ bool Map_LoadMap(char* pFilePath, MapInfo_t* pInfoOut)
         int x = 0;
         char* pLine = NULL;
         size_t lineLen = 0;
-        if (getline(&pLine, &lineLen, pFile))
+        if (getline(&pLine, &lineLen, pFile) > 0)
         {
             // Process the line and extract the comma-delimited values
             char* pToken = strtok(pLine, ",");
-            while (pToken)
+            while (pToken && x < MAP_INFO_MAX_GRID_X)
             {
                 const char TokenAsInt = atoi(pToken);
                 pInfoOut->Grid[y][x] = (char)TokenAsInt;
@@ -57,7 +57,7 @@ bool Map_LoadMap(char* pFilePath, MapInfo_t* pInfoOut)
         }
         else if (pInfoOut->MapWidth != x)
         {
-            fprintf(stderr, "Inconsistent map width\n");
+            fprintf(stderr, "Inconsistent map width: %d != %d\n", pInfoOut->MapWidth, x);
             return false;
         }
 
