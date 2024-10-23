@@ -1,6 +1,5 @@
-- Fix DR_DrawTile() transforms for isometric tiling
--- *almost* there
 - Load tilemap csv files
-- Render single-layer tilemap
+-- Almost there, gotta fix negation of y-axis
 - Render multi-layer tilemaps
 - Camera control and movement
+- Support for more than one tile
