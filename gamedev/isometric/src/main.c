@@ -25,13 +25,14 @@ void mainloop()
     DR_BeginFrame(&g_RenderContext);
 
     const int TileIndex = 0;
-    for (int y = g_mapInfo.MapHeight - 1; y >= 0; --y)
+    for (int y = 0; y < g_mapInfo.MapHeight; ++y)
     {
         for (int x = 0; x < g_mapInfo.MapWidth; ++x)
         {
             if(g_mapInfo.Grid[y][x] == 0)
             {
-                DR_DrawTile(&g_RenderContext, (float)x, (float)y, TileIndex);
+                // TODO: Shouldn't have to negate this
+                DR_DrawTile(&g_RenderContext, (float)x, (float)-y, TileIndex);
             }
         }
     }
@@ -96,8 +97,8 @@ int main(int argc, char** argv)
     DR_SetView(&g_RenderContext, &viewMatrix);
 
     Vector2f tilemapOffset = {
-        .x = TILE_WIDTH_PX / 2.f,
-        .y = Top / 2.f
+        .x = Right / 2.f,
+        .y = Top - TILE_HEIGHT_PX,
     };
     DR_SetTilemapOffset(&g_RenderContext, &tilemapOffset);
 
