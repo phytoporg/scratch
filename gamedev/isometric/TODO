@@ -1,5 +1,6 @@
 - Load tilemap csv files
 -- Almost there, gotta fix negation of y-axis
-- Render multi-layer tilemaps
+- Support for character (placeholder)
 - Camera control and movement
-- Support for more than one tile
+
+- Render multi-layer tilemaps
