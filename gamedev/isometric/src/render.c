@@ -12,11 +12,15 @@ typedef u32 HSHADER;
 #define TILE_HEIGHT_PX 32
 #define TILE_WIDTH_PX 32
 
+#define MAX_TILES 4
+
 typedef struct {
     HSHADER ForwardProgram;
 
     Matrix44f Projection;
     Matrix44f View;
+
+    Matrix33f TileTextureMatrices[MAX_TILES];
 
     u32 QuadVAO;
     u32 QuadVBO;
@@ -215,6 +219,16 @@ void DR_SetShaderParameteri(HSHADER shaderHandle, char* pName, u32 value)
     glUniform1i(glGetUniformLocation(shaderHandle, pName), value);
 }
 
+void DR_SetShaderParameterMat2(HSHADER shaderHandle, char* pName, Matrix22f* pMat)
+{
+    glUniformMatrix2fv(glGetUniformLocation(shaderHandle, pName), 1, GL_FALSE, &pMat->m[0][0]);
+}
+
+void DR_SetShaderParameterMat3(HSHADER shaderHandle, char* pName, Matrix33f* pMat)
+{
+    glUniformMatrix3fv(glGetUniformLocation(shaderHandle, pName), 1, GL_FALSE, &pMat->m[0][0]);
+}
+
 void DR_SetShaderParameterMat4(HSHADER shaderHandle, char* pName, Matrix44f* pMat)
 {
     glUniformMatrix4fv(glGetUniformLocation(shaderHandle, pName), 1, GL_FALSE, &pMat->m[0][0]);
@@ -291,8 +305,7 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
 
     if (!_DR_TextureFromFile(&pContext->TilemapTexture, TILEMAP_TEXTURE_PATH, pAssetRoot))
     {
-        fprintf(
-            stderr, "Failed to load texture from file: %s\n", TILEMAP_TEXTURE_PATH);
+        fprintf(stderr, "Failed to load texture from file: %s\n", TILEMAP_TEXTURE_PATH);
         return false;
     }
 
@@ -304,6 +317,22 @@ bool DR_Initialize(RenderContext_t* pContext, char* pAssetRoot)
     glDepthFunc(GL_ALWAYS);
 
     return true;
+}
+
+void DR_SetTileTextureMatrices(
+    RenderContext_t* pContext,
+    Matrix33f* pMatrices,
+    u32 numMatrices)
+{
+    for (u32 i = 0; i < numMatrices; ++i)
+    {
+        if (i >= MAX_TILES)
+        {
+            break;
+        }
+
+        pContext->TileTextureMatrices[i] = pMatrices[i];
+    }
 }
 
 void DR_BeginFrame(RenderContext_t* pContext)
@@ -329,6 +358,17 @@ void DR_BeginFrame(RenderContext_t* pContext)
         pContext->ForwardProgram,
         "view",
         &pContext->View);
+
+    char uniformNameBuffer[128] = {};
+    for (u32 i = 0; i < MAX_TILES; ++i)
+    {
+        sprintf(uniformNameBuffer, "tileMatrices[%d]", i);
+
+        DR_SetShaderParameterMat3(
+            pContext->ForwardProgram,
+            uniformNameBuffer,
+            &pContext->TileTextureMatrices[i]);
+    }
 }
 
 void DR_EndFrame(RenderContext_t* pContext)
@@ -365,6 +405,11 @@ void DR_DrawTile(RenderContext_t* pContext, float x, float y, int tileIndex)
         pContext->ForwardProgram,
         "model",
         &modelMatrix);
+
+    DR_SetShaderParameteri(
+        pContext->ForwardProgram,
+        "tileIndex",
+        tileIndex);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, pContext->TilemapTexture);

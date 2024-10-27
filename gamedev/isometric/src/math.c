@@ -10,6 +10,16 @@ typedef struct
 
 typedef struct
 {
+    float m[3][3];
+} Matrix33f;
+
+typedef struct
+{
+    float m[2][2];
+} Matrix22f;
+
+typedef struct
+{
     union
     {
         struct
@@ -100,6 +110,59 @@ void Math_Vector3f_Normalize(Vector3f* pV)
 {
     const float Len = Math_Vector3f_Length(pV);
     Math_Vector3f_Divide(pV, Len);
+}
+
+// Matrix22f
+void Math_Matrix22f_Zero(Matrix22f* pM)
+{
+    memset(pM, 0, sizeof(*pM));
+}
+
+void Math_Matrix22f_Identity(Matrix22f* pM)
+{
+    memset(pM, 0, sizeof(*pM));
+    pM->m[0][0] = 1.f;
+    pM->m[1][1] = 1.f;
+}
+
+void Math_Matrix22f_Translate(Matrix22f* pM, Vector2f* pV)
+{
+    pM->m[1][0] += pV->x;
+    pM->m[1][1] += pV->y;
+}
+
+void Math_Matrix22f_Scale(Matrix22f* pM, Vector2f* pV)
+{
+    pM->m[0][0] *= pV->x;
+    pM->m[1][1] *= pV->y;
+}
+
+// Matrix33f
+void Math_Matrix33f_Zero(Matrix33f* pM)
+{
+    memset(pM, 0, sizeof(*pM));
+}
+
+void Math_Matrix33f_Identity(Matrix33f* pM)
+{
+    memset(pM, 0, sizeof(*pM));
+    pM->m[0][0] = 1.f;
+    pM->m[1][1] = 1.f;
+    pM->m[2][2] = 1.f;
+}
+
+void Math_Matrix33f_Translate(Matrix33f* pM, Vector3f* pV)
+{
+    pM->m[2][0] += pV->x;
+    pM->m[2][1] += pV->y;
+    pM->m[2][2] += pV->z;
+}
+
+void Math_Matrix33f_Scale(Matrix33f* pM, Vector3f* pV)
+{
+    pM->m[0][0] *= pV->x;
+    pM->m[1][1] *= pV->y;
+    pM->m[2][2] *= pV->z;
 }
 
 // Matrix44f

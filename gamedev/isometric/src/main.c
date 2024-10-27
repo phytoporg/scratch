@@ -24,12 +24,12 @@ void mainloop()
 
     DR_BeginFrame(&g_RenderContext);
 
-    const int TileIndex = 0;
     for (int y = 0; y < g_mapInfo.MapHeight; ++y)
     {
         for (int x = 0; x < g_mapInfo.MapWidth; ++x)
         {
-            if(g_mapInfo.Grid[y][x] == 0)
+            const int TileIndex = g_mapInfo.Grid[y][x];
+            if(TileIndex >= 0)
             {
                 // TODO: Shouldn't have to negate this
                 DR_DrawTile(&g_RenderContext, (float)x, (float)-y, TileIndex);
@@ -101,6 +101,28 @@ int main(int argc, char** argv)
         .y = Top - TILE_HEIGHT_PX,
     };
     DR_SetTilemapOffset(&g_RenderContext, &tilemapOffset);
+
+    // Assuming one single linear row for now
+    Matrix33f textureMatrices[MAX_TILES];
+    for (u32 i = 0; i < MAX_TILES; ++i)
+    {
+        Math_Matrix33f_Identity(&textureMatrices[i]);
+
+        const float dU = 1.0f / (float)MAX_TILES;
+        Vector3f Scale = {
+            .x = dU,
+            .y = 1.f,
+            .z = 1.f
+        };
+        Vector3f Translation = {
+            .x = dU * i,
+            .y = 0.f,
+            .z = 1.f
+        };
+        Math_Matrix33f_Scale(&textureMatrices[i], &Scale);
+        Math_Matrix33f_Translate(&textureMatrices[i], &Translation);
+    }
+    DR_SetTileTextureMatrices(&g_RenderContext, textureMatrices, MAX_TILES);
 
     if (!Map_LoadMap("./assets/tilemap.csv", &g_mapInfo))
     {
