@@ -31,8 +31,7 @@ void mainloop()
             const int TileIndex = g_mapInfo.Grid[y][x];
             if(TileIndex >= 0)
             {
-                // TODO: Shouldn't have to negate this
-                DR_DrawTile(&g_RenderContext, (float)x, (float)-y, TileIndex);
+                DR_DrawTile(&g_RenderContext, (float)x, (float)y, TileIndex);
             }
         }
     }

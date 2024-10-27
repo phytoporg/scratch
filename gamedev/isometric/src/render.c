@@ -396,8 +396,8 @@ void DR_DrawTile(RenderContext_t* pContext, float x, float y, int tileIndex)
     const float yOffset = pContext->TilemapOffset.y;
 
     Vector3f translation = {
-        HalfTileWidth * (x + y) + xOffset,
-        0.5f * HalfTileHeight * (y - x) + yOffset,
+        HalfTileWidth * (x - y) + xOffset,
+        0.5f * HalfTileHeight * -(y + x) + yOffset,
         -0.1f };
     Math_Matrix44f_Translate(&modelMatrix, &translation);
 

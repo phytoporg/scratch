@@ -1,5 +1,3 @@
-- Load tilemap csv files
--- Almost there, gotta fix negation of y-axis
 - Support for character (placeholder)
 - Camera control and movement
 
