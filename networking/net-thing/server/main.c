@@ -4,6 +4,8 @@
 #include <string.h>
 
 #include <net/socket.c>
+#include <system/time.c>
+
 #include <util/util.h>
 
 struct client_connection 
@@ -72,11 +74,12 @@ bool _server_init(struct server_context* context)
     return true;
 }
 
-void _server_loop(struct server_context* context)
+bool _server_tick(struct server_context* context)
 {
     uint8_t buffer[COMMON_MTU] = {0};
     const size_t max_packet_size = sizeof(buffer);
-    while (true)
+    bool looping = true;
+    while (looping)
     {
         int address, port;
         const int received = 
@@ -122,9 +125,11 @@ void _server_loop(struct server_context* context)
         }
         else if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
-            // TODO: wait
+            looping = false;
         }
     }
+
+    return true;
 }
 
 int main(int argc, char** argv)
@@ -135,7 +140,22 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    _server_loop(&context);
+    // 120hz server tick
+    const uint64_t TICK_FREQ_NS = BILLION / 120;
+    bool keep_ticking = true;
+    do
+    {
+        const uint64_t start_ns = system_time_ns();
+        keep_ticking = _server_tick(&context);
+        const uint64_t end_ns = system_time_ns();
+
+        const uint64_t diff = end_ns - start_ns;
+        if (diff < TICK_FREQ_NS)
+        {
+            const uint64_t time_remaining_ns = (TICK_FREQ_NS - diff);
+            sleep_ns(time_remaining_ns);
+        }
+    } while(keep_ticking);
 
     return 0;
 }

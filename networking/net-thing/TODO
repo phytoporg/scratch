@@ -1,1 +1,8 @@
 - Break down implementation for virtual udp connection
+-- Real tick logic on server side
+-- Handle client timeouts/disconnect
+
+- Introduce a reliable udp protocol
+-- Real tick on client
+-- Packet header w/sequence # + ack (ack bitfield)
+-- Track local & remote sequence #s
