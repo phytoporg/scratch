@@ -8,18 +8,29 @@
 
 #include <util/util.h>
 
+#define SERVER_TIMEOUT_SEC 5
+
 struct client_connection 
 {
     int client_id;
     int address;
     int port;
+    uint64_t prev_recv_ns;
 };
+
+void _client_connection_init(struct client_connection* connection)
+{
+    memset(connection, 0, sizeof(*connection));
+    connection->client_id = -1;
+    connection->prev_recv_ns = 0;
+}
 
 #define MAX_CONNECTIONS 2
 struct server_context
 {
     int socket_handle;
     int num_connections;
+    int last_client_id;
     struct client_connection connections[MAX_CONNECTIONS];
 };
 
@@ -46,10 +57,10 @@ bool _server_init(struct server_context* context)
 
     context->socket_handle = -1;
     context->num_connections = 0;
-    memset(context->connections, 0, sizeof(context->connections));
+    context->last_client_id = -1;
     for (int c = 0; c < MAX_CONNECTIONS; ++c)
     {
-        context->connections[c].client_id = -1;
+        _client_connection_init(&context->connections[c]);
     }
 
     context->socket_handle = socket_create_udp();
@@ -82,7 +93,7 @@ bool _server_tick(struct server_context* context)
     while (looping)
     {
         int address, port;
-        const int received = 
+        const int received =
             socket_recv(context->socket_handle,
                         buffer,
                         max_packet_size,
@@ -101,31 +112,74 @@ bool _server_tick(struct server_context* context)
                 }
 
                 // Add a new connection
-                struct client_connection* next_connection = 
-                    &context->connections[context->num_connections];
-                next_connection->client_id = context->num_connections;
-                next_connection->address = address;
-                next_connection->port = port;
-                ++context->num_connections;
+                struct client_connection* next_connection = NULL;
+                for (int c = 0; c < MAX_CONNECTIONS; ++c)
+                {
+                    if (context->connections[c].client_id < 0)
+                    {
+                        next_connection = &context->connections[c];
+                        break;
+                    }
+                }
 
-                fprintf(stdout,
-                        "New connection: %d (port=%d)\n", 
-                        next_connection->client_id,
-                        next_connection->port);
+                if (next_connection)
+                {
+                    next_connection->client_id = ++context->last_client_id;
+                    next_connection->address = address;
+                    next_connection->port = port;
+                    ++context->num_connections;
+
+                    fprintf(stdout,
+                            "New connection: %d (port=%d)\n",
+                            next_connection->client_id,
+                            next_connection->port);
+                }
+                else
+                {
+                    fprintf(stderr, "Unexpected: could not find free client slot");
+                }
             }
-            else
+
             {
-                struct client_connection* connection = 
-                    &context->connections[index];
-                fprintf(stdout,
-                        "msg from existing client %d: %s\n",
-                        connection->client_id,
-                        buffer);
+                const int index = _server_find_connection(context, address, port);
+                if (index >= 0 && index <= MAX_CONNECTIONS)
+                {
+                    struct client_connection* connection = &context->connections[index];
+                    fprintf(stdout,
+                            "msg from existing client %d: %s\n",
+                            connection->client_id,
+                            buffer);
+
+                    connection->prev_recv_ns = system_time_ns();
+                }
             }
         }
         else if (errno == EAGAIN || errno == EWOULDBLOCK)
         {
             looping = false;
+        }
+
+        // Check for any timeouts
+        const uint64_t now_ns = system_time_ns();
+        for (int c = 0; c < MAX_CONNECTIONS; ++c)
+        {
+            struct client_connection* connection = &context->connections[c];
+            if (connection->client_id < 0)
+            {
+                continue;
+            }
+
+            const uint64_t delta_ns = now_ns - connection->prev_recv_ns;
+            const uint64_t timeout_threshold_ns = SERVER_TIMEOUT_SEC * BILLION;
+            if (delta_ns >= timeout_threshold_ns)
+            {
+                // Remove connection
+                const int client_id = connection->client_id;
+                _client_connection_init(connection);
+                fprintf(stdout, "Connection timeout - client-id: %d\n", client_id);
+
+                context->num_connections--;
+            }
         }
     }
 
