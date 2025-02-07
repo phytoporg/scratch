@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include "pb-render.c"
+#include "pb-input.c"
 
 // Constants
 #define SCREEN_WIDTH 1280
@@ -17,38 +18,85 @@
 
 #define PADDLE_WIDTH 30
 #define PADDLE_HEIGHT 100
+#define PADDLE_SPEED 10
 
 #define FPS 60.0f
 
 typedef struct
 {
     // Should probably live w/physics geometry, migrate when that's in place
+    bool inputUpPressed;
+    bool inputDownPressed;
     int FieldUpperLeftX;
     int FieldUpperLeftY;
     int LeftPaddlePosX;
     int LeftPaddlePosY;
     int RightPaddlePosX;
     int RightPaddlePosY;
+    InputContext InputContext;
 } GameState;
 
-void GameState_init(GameState* gameState) 
+void GameState_init(GameState* pGameState) 
 {
+    memset(pGameState, 0, sizeof(*pGameState));
+
     const int HalfScreenWidth = SCREEN_WIDTH / 2;
     const int HalfScreenHeight = SCREEN_HEIGHT / 2;
     const int HalfFieldWidth = FIELD_WIDTH / 2;
     const int HalfFieldHeight = FIELD_HEIGHT / 2;
     const int HalfPaddleHeight = PADDLE_HEIGHT / 2;
 
-    gameState->FieldUpperLeftX = HalfScreenWidth - HalfFieldWidth;
-    gameState->FieldUpperLeftY = HalfScreenHeight - HalfFieldHeight;
-    gameState->LeftPaddlePosX = gameState->FieldUpperLeftX;
-    gameState->LeftPaddlePosY = gameState->FieldUpperLeftY + 
+    pGameState->FieldUpperLeftX = HalfScreenWidth - HalfFieldWidth;
+    pGameState->FieldUpperLeftY = HalfScreenHeight - HalfFieldHeight;
+    pGameState->LeftPaddlePosX = pGameState->FieldUpperLeftX;
+    pGameState->LeftPaddlePosY = pGameState->FieldUpperLeftY + 
                                 HalfFieldHeight - 
                                 HalfPaddleHeight;
-    gameState->RightPaddlePosX = gameState->FieldUpperLeftX + 
+    pGameState->RightPaddlePosX = pGameState->FieldUpperLeftX + 
                                  FIELD_WIDTH - 
                                  PADDLE_WIDTH;
-    gameState->RightPaddlePosY = gameState->LeftPaddlePosY;
+    pGameState->RightPaddlePosY = pGameState->LeftPaddlePosY;
+}
+
+void GameState_update(GameState* pGameState)
+{
+    if (pGameState->inputUpPressed)
+    {
+        pGameState->LeftPaddlePosY -= PADDLE_SPEED;
+        if (pGameState->LeftPaddlePosY < pGameState->FieldUpperLeftY)
+        {
+            pGameState->LeftPaddlePosY = pGameState->FieldUpperLeftY;
+        }
+    }
+
+    if (pGameState->inputDownPressed)
+    {
+        pGameState->LeftPaddlePosY += PADDLE_SPEED;
+        const int FieldBottom = pGameState->FieldUpperLeftY + FIELD_HEIGHT;
+        const int PaddleBottom = pGameState->LeftPaddlePosY + PADDLE_HEIGHT;
+        if (PaddleBottom > FieldBottom)
+        {
+            pGameState->LeftPaddlePosY = FieldBottom - PADDLE_HEIGHT;
+        }
+    }
+}
+
+void Input_init(InputContext* pInput)
+{
+    InputInitializeContext(pInput);
+
+    // Might be nice to have a macro?
+    pInput->InputMap[INPUTEVENT_QUIT].Scancodes[0] = SDL_SCANCODE_Q;
+    pInput->InputMap[INPUTEVENT_QUIT].Scancodes[1] = SDL_SCANCODE_ESCAPE;
+    pInput->InputMap[INPUTEVENT_QUIT].NumScancodes = 2;
+
+    pInput->InputMap[INPUTEVENT_UP].Scancodes[0] = SDL_SCANCODE_W;
+    pInput->InputMap[INPUTEVENT_UP].Scancodes[1] = SDL_SCANCODE_UP;
+    pInput->InputMap[INPUTEVENT_UP].NumScancodes = 2;
+
+    pInput->InputMap[INPUTEVENT_DOWN].Scancodes[0] = SDL_SCANCODE_S;
+    pInput->InputMap[INPUTEVENT_DOWN].Scancodes[1] = SDL_SCANCODE_DOWN;
+    pInput->InputMap[INPUTEVENT_DOWN].NumScancodes = 2;
 }
 
 // Globals
@@ -80,6 +128,14 @@ static void mainloop()
             g_shouldQuit = true;
         }
     }
+
+    InputContext* pInput = &(g_GameState.InputContext);
+    InputUpdateContext(pInput);
+    g_shouldQuit = InputHasEventPressed(pInput, INPUTEVENT_QUIT);
+    g_GameState.inputUpPressed = InputHasEvent(pInput, INPUTEVENT_UP);
+    g_GameState.inputDownPressed = InputHasEvent(pInput, INPUTEVENT_DOWN);
+
+    GameState_update(&g_GameState);
 
     RenderField(
         g_pRender,
@@ -140,6 +196,7 @@ int main(int argc, char** argv)
     srand(time(NULL));
 
     GameState_init(&g_GameState);
+    Input_init(&g_GameState.InputContext);
 
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(mainloop, 0, 1);
