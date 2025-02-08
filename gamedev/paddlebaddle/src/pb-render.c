@@ -1,9 +1,9 @@
 #define FIELD_BORDER_PX 10
 
-void _RenderColoredRect(
+void RenderColoredRect(
     SDL_Renderer* pRender,
     const SDL_Color* pColor,
-    int x, int y, int w, int h)
+    Rect* pRect)
 {
     SDL_SetRenderDrawColor( pRender,
         pColor->r,
@@ -12,40 +12,33 @@ void _RenderColoredRect(
         pColor->a);
 
     const SDL_Rect rect = {
-        .x = x,
-        .y = y,
-        .w = w,
-        .h = h
+        .x = pRect->x,
+        .y = pRect->y,
+        .w = pRect->w,
+        .h = pRect->h
     };
     SDL_RenderFillRect(pRender, &rect);
 }
 
-void RenderField(SDL_Renderer* pRender, int x, int y, int w, int h)
+// Using knowledge about gameplay state but whatever
+void RenderField(SDL_Renderer* pRender, SDL_Color* pColor, Rect* pRect)
 {
-    const SDL_Color FieldBorderColor = { 255, 255, 255, SDL_ALPHA_OPAQUE };
-
     // Upper
-    _RenderColoredRect(
-        pRender, &FieldBorderColor, x, y - FIELD_BORDER_PX, w, FIELD_BORDER_PX);
+    Rect topRect = {
+        .x = pRect->x,
+        .y = pRect->y - FIELD_BORDER_PX,
+        .w = pRect->w,
+        .h = FIELD_BORDER_PX,
+    };
+    RenderColoredRect(pRender, pColor, &topRect);
+
     // Lower
-    _RenderColoredRect(
-        pRender, &FieldBorderColor, x, y + h, w, FIELD_BORDER_PX);
+    Rect bottomRect = {
+        .x = pRect->x,
+        .y = pRect->y + pRect->h,
+        .w = pRect->w,
+        .h = FIELD_BORDER_PX,
+    };
+    RenderColoredRect(pRender, pColor, &bottomRect);
 }
 
-void RenderRightPaddle(SDL_Renderer* pRender, int x, int y, int w, int h)
-{
-    // Red-ish
-    const SDL_Color RightPaddleColor = { 200, 50, 0, SDL_ALPHA_OPAQUE };
-
-    _RenderColoredRect(
-        pRender, &RightPaddleColor, x, y, w, h);
-}
-
-void RenderLeftPaddle(SDL_Renderer* pRender, int x, int y, int w, int h)
-{
-    // Blue-ish
-    const SDL_Color LeftPaddleColor = { 0, 100, 255, SDL_ALPHA_OPAQUE };
-
-    _RenderColoredRect(
-        pRender, &LeftPaddleColor, x, y, w, h);
-}

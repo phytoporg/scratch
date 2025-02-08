@@ -5,6 +5,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "pb-math.c"
 #include "pb-render.c"
 #include "pb-input.c"
 
@@ -20,6 +21,10 @@
 #define PADDLE_HEIGHT 100
 #define PADDLE_SPEED 10
 
+#define BALL_WIDTH 15
+#define BALL_HEIGHT 15
+#define BALL_SPEED 15
+
 #define FPS 60.0f
 
 typedef struct
@@ -27,13 +32,19 @@ typedef struct
     // Should probably live w/physics geometry, migrate when that's in place
     bool inputUpPressed;
     bool inputDownPressed;
-    int FieldUpperLeftX;
-    int FieldUpperLeftY;
-    int LeftPaddlePosX;
-    int LeftPaddlePosY;
-    int RightPaddlePosX;
-    int RightPaddlePosY;
+    Rect FieldRect;
+    Rect LeftPaddleRect;
+    Rect RightPaddleRect;
+    Rect PreviousBallRect;
+    Rect BallRect;
+    Vector2i BallDirection;
     InputContext InputContext;
+
+    // Colors
+    SDL_Color FieldBorderColor;
+    SDL_Color RightPaddleColor;
+    SDL_Color LeftPaddleColor;
+    SDL_Color BallColor;
 } GameState;
 
 void GameState_init(GameState* pGameState) 
@@ -46,39 +57,145 @@ void GameState_init(GameState* pGameState)
     const int HalfFieldHeight = FIELD_HEIGHT / 2;
     const int HalfPaddleHeight = PADDLE_HEIGHT / 2;
 
-    pGameState->FieldUpperLeftX = HalfScreenWidth - HalfFieldWidth;
-    pGameState->FieldUpperLeftY = HalfScreenHeight - HalfFieldHeight;
-    pGameState->LeftPaddlePosX = pGameState->FieldUpperLeftX;
-    pGameState->LeftPaddlePosY = pGameState->FieldUpperLeftY + 
-                                HalfFieldHeight - 
-                                HalfPaddleHeight;
-    pGameState->RightPaddlePosX = pGameState->FieldUpperLeftX + 
-                                 FIELD_WIDTH - 
-                                 PADDLE_WIDTH;
-    pGameState->RightPaddlePosY = pGameState->LeftPaddlePosY;
+    pGameState->FieldRect = (Rect) {
+        .x = HalfScreenWidth - HalfFieldWidth,
+        .y = HalfScreenHeight - HalfFieldHeight,
+        .w = FIELD_WIDTH,
+        .h = FIELD_HEIGHT
+    };
+
+    pGameState->LeftPaddleRect = (Rect) {
+        .x = pGameState->FieldRect.x,
+        .y = pGameState->FieldRect.y + 
+             HalfFieldHeight - 
+             HalfPaddleHeight,
+        .w = PADDLE_WIDTH,
+        .h = PADDLE_HEIGHT
+    };
+
+    pGameState->RightPaddleRect = (Rect) {
+        .x = pGameState->FieldRect.x + FIELD_WIDTH - PADDLE_WIDTH,
+        .y = pGameState->LeftPaddleRect.y,
+        .w = PADDLE_WIDTH,
+        .h = PADDLE_HEIGHT
+    };
+
+    pGameState->PreviousBallRect = (Rect) { .x = -1, .y = -1, .w = -1, .h = -1 };
+
+    pGameState->BallRect = (Rect) {
+        .x = pGameState->FieldRect.x + HalfFieldWidth,
+        .y = pGameState->FieldRect.y + HalfFieldHeight,
+        .w = BALL_WIDTH,
+        .h = BALL_HEIGHT,
+    };
+
+    // TODO: real gameplay solution
+    pGameState->BallDirection = (Vector2i) {
+        .x = BALL_SPEED / 3.f,
+        .y = BALL_SPEED / 2.f,
+    };
+
+    // Init colors
+    pGameState->FieldBorderColor = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
+    pGameState->RightPaddleColor = (SDL_Color) { 200, 50, 0, SDL_ALPHA_OPAQUE };
+    pGameState->LeftPaddleColor = (SDL_Color) { 0, 100, 255, SDL_ALPHA_OPAQUE };
+    pGameState->BallColor = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
+}
+
+typedef enum {
+    NoCollision,
+    LeftPaddleCollision,
+    RightPaddleCollision,
+    TopFieldCollision,
+    BottomFieldCollision,
+} BallCollision;
+
+void GameState_updateBall(GameState* pGameState)
+{
+    // Move the ball according to the current state
+    Vector2i nextBallPos = {
+        .x = pGameState->BallRect.x + pGameState->BallDirection.x,
+        .y = pGameState->BallRect.y + pGameState->BallDirection.y
+    };
+
+    // Check for collisions
+    BallCollision collision = NoCollision;
+
+    Extents BallExtents = rect_to_extents(&pGameState->BallRect);
+    const int FieldBottom = rect_extent_bottom(&pGameState->FieldRect);
+    const int FieldTop = rect_extent_top(&pGameState->FieldRect);
+    if (BallExtents.Top <= FieldTop && pGameState->BallDirection.y < 0)
+    {
+        collision = TopFieldCollision;
+    }
+    else if (BallExtents.Bottom >= FieldBottom && pGameState->BallDirection.y > 0)
+    {
+        collision = BottomFieldCollision;
+    }
+    else if (rect_test_intersects(&pGameState->BallRect, &pGameState->LeftPaddleRect) &&
+             pGameState->BallDirection.x < 0)
+    {
+        collision = LeftPaddleCollision;
+    }
+    else if (rect_test_intersects(&pGameState->BallRect, &pGameState->RightPaddleRect) &&
+             pGameState->BallDirection.x > 0)
+    {
+        collision = RightPaddleCollision;
+    }
+
+    // Collision response
+    // TODO: account for tunnelling and account for distance traveled beyond the
+    // point of collision
+    if (collision == TopFieldCollision)
+    {
+        nextBallPos.y = pGameState->FieldRect.y;
+        pGameState->BallDirection.y = -pGameState->BallDirection.y;
+    }
+    else if (collision == BottomFieldCollision)
+    {
+        nextBallPos.y = FieldBottom - BALL_HEIGHT;
+        pGameState->BallDirection.y = -pGameState->BallDirection.y;
+    }
+    else if (collision == LeftPaddleCollision)
+    {
+        nextBallPos.x = rect_extent_right(&pGameState->LeftPaddleRect);
+        pGameState->BallDirection.x = -pGameState->BallDirection.x;
+    }
+    else if (collision == RightPaddleCollision)
+    {
+        nextBallPos.x = rect_extent_left(&pGameState->RightPaddleRect) - BALL_WIDTH;
+        pGameState->BallDirection.x = -pGameState->BallDirection.x;
+    }
+
+    // Apply position update
+    pGameState->PreviousBallRect = pGameState->BallRect;
+    pGameState->BallRect.x = nextBallPos.x;
+    pGameState->BallRect.y = nextBallPos.y;
 }
 
 void GameState_update(GameState* pGameState)
 {
     if (pGameState->inputUpPressed)
     {
-        pGameState->LeftPaddlePosY -= PADDLE_SPEED;
-        if (pGameState->LeftPaddlePosY < pGameState->FieldUpperLeftY)
+        pGameState->LeftPaddleRect.y -= PADDLE_SPEED;
+        if (pGameState->LeftPaddleRect.y < pGameState->FieldRect.y)
         {
-            pGameState->LeftPaddlePosY = pGameState->FieldUpperLeftY;
+            pGameState->LeftPaddleRect.y = pGameState->FieldRect.y;
         }
     }
 
     if (pGameState->inputDownPressed)
     {
-        pGameState->LeftPaddlePosY += PADDLE_SPEED;
-        const int FieldBottom = pGameState->FieldUpperLeftY + FIELD_HEIGHT;
-        const int PaddleBottom = pGameState->LeftPaddlePosY + PADDLE_HEIGHT;
+        pGameState->LeftPaddleRect.y += PADDLE_SPEED;
+        const int FieldBottom = rect_extent_bottom(&pGameState->FieldRect);
+        const int PaddleBottom = rect_extent_bottom(&pGameState->LeftPaddleRect);
         if (PaddleBottom > FieldBottom)
         {
-            pGameState->LeftPaddlePosY = FieldBottom - PADDLE_HEIGHT;
+            pGameState->LeftPaddleRect.y = FieldBottom - PADDLE_HEIGHT;
         }
     }
+
+    GameState_updateBall(pGameState);
 }
 
 void Input_init(InputContext* pInput)
@@ -137,24 +254,13 @@ static void mainloop()
 
     GameState_update(&g_GameState);
 
-    RenderField(
-        g_pRender,
-        g_GameState.FieldUpperLeftX,
-        g_GameState.FieldUpperLeftY,
-        FIELD_WIDTH,
-        FIELD_HEIGHT);
-    RenderLeftPaddle(
-        g_pRender,
-        g_GameState.LeftPaddlePosX,
-        g_GameState.LeftPaddlePosY,
-        PADDLE_WIDTH,
-        PADDLE_HEIGHT);
-    RenderRightPaddle(
-        g_pRender,
-        g_GameState.RightPaddlePosX,
-        g_GameState.RightPaddlePosY,
-        PADDLE_WIDTH,
-        PADDLE_HEIGHT);
+    RenderField(g_pRender, &g_GameState.FieldBorderColor, &g_GameState.FieldRect);
+    RenderColoredRect( 
+        g_pRender, &g_GameState.LeftPaddleColor, &g_GameState.LeftPaddleRect);
+    RenderColoredRect( 
+        g_pRender, &g_GameState.RightPaddleColor, &g_GameState.RightPaddleRect);
+    RenderColoredRect( 
+        g_pRender, &g_GameState.BallColor, &g_GameState.BallRect);
 
     Uint64 endTime = SDL_GetPerformanceCounter();
 
@@ -176,7 +282,7 @@ int main(int argc, char** argv)
     }
 
     SDL_Window* g_pWindow = SDL_CreateWindow(
-            "lil-tetris",
+            "paddlebaddle",
             SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
             SCREEN_WIDTH, SCREEN_HEIGHT,
             SDL_WINDOW_SHOWN);

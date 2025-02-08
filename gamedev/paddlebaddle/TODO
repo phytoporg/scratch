@@ -1,6 +1,3 @@
-- Poll input
-- Spawn a ball
-- Move the ball
-- Collision detection & response
+- Handle tunneling & collision point logic
 - Basic AI
 - Point scoring & volleys
