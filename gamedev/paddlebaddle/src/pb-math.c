@@ -1,3 +1,10 @@
+// Vectors
+typedef struct 
+{
+    int x;
+    int y;
+} Vector2i;
+
 
 // Rects
 
@@ -48,6 +55,17 @@ int rect_extent_right(Rect* pRect)
     return pRect->x + pRect->w;
 }
 
+void rect_set_pos(Rect* pRect, Vector2i* pPos)
+{
+    pRect->x = pPos->x;
+    pRect->y = pPos->y;
+}
+
+Vector2i rect_get_pos(Rect* pRect)
+{
+    return (Vector2i) { .x = pRect->x, .y = pRect->y };
+}
+
 bool rect_test_intersects(Rect* pA, Rect* pB)
 {
     const Extents extentsA = rect_to_extents(pA);
@@ -59,11 +77,3 @@ bool rect_test_intersects(Rect* pA, Rect* pB)
         extentsA.Top <= extentsB.Bottom &&
         extentsA.Bottom >= extentsB.Top;
 }
-
-// Vectors
-typedef struct 
-{
-    int x;
-    int y;
-} Vector2i;
-

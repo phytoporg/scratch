@@ -169,8 +169,7 @@ void GameState_updateBall(GameState* pGameState)
 
     // Apply position update
     pGameState->PreviousBallRect = pGameState->BallRect;
-    pGameState->BallRect.x = nextBallPos.x;
-    pGameState->BallRect.y = nextBallPos.y;
+    rect_set_pos(&pGameState->BallRect, &nextBallPos);
 }
 
 void GameState_update(GameState* pGameState)
