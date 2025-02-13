@@ -90,10 +90,10 @@ void GameState_init(GameState* pGameState)
     };
 
     // TODO: real gameplay solution
-    pGameState->BallDirection = (Vector2i) {
-        .x = BALL_SPEED / 3.f,
-        .y = BALL_SPEED / 2.f,
-    };
+    Vector2f direction = (Vector2f) { .x = 2.f, .y = 3.f };
+    direction = Vector2f_normalize(&direction);
+    direction = Vector2f_mult_scalar(&direction, BALL_SPEED);
+    pGameState->BallDirection = Vector2f_to_Vector2i(&direction);
 
     // Init colors
     pGameState->FieldBorderColor = (SDL_Color) { 255, 255, 255, SDL_ALPHA_OPAQUE };
@@ -110,6 +110,26 @@ typedef enum {
     BottomFieldCollision,
 } BallCollision;
 
+void collisionResponse_GetBounceVector(Rect* pBall, Rect* pPaddle, Vector2i* pBounceOut)
+{
+    const float halfBallHeight = BALL_HEIGHT / 2.f;
+    const float ballMidY = pBall->y + halfBallHeight;
+    const float halfPaddleHeight = PADDLE_HEIGHT / 2.f;
+    const float paddleMidY = pPaddle->y + halfPaddleHeight;
+
+    const float cosAlpha = (ballMidY - paddleMidY) / halfPaddleHeight;
+    const float alpha = acosf(cosAlpha);
+    const float y = cosAlpha * tanf(alpha);
+
+    Vector2f bounce = (Vector2f) {
+        .x = y * (pBall->x < pPaddle->x ? -1.f : 1.f),
+        .y = cosAlpha
+    };
+
+    bounce = Vector2f_mult_scalar(&bounce, BALL_SPEED);
+    *pBounceOut = Vector2f_to_Vector2i(&bounce);
+}
+
 void GameState_updateBall(GameState* pGameState)
 {
     // Move the ball according to the current state
@@ -124,6 +144,7 @@ void GameState_updateBall(GameState* pGameState)
     Extents BallExtents = rect_to_extents(&pGameState->BallRect);
     const int FieldBottom = rect_extent_bottom(&pGameState->FieldRect);
     const int FieldTop = rect_extent_top(&pGameState->FieldRect);
+    RectIntersectResult intersectResult;
     if (BallExtents.Top <= FieldTop && pGameState->BallDirection.y < 0)
     {
         collision = TopFieldCollision;
@@ -132,12 +153,12 @@ void GameState_updateBall(GameState* pGameState)
     {
         collision = BottomFieldCollision;
     }
-    else if (rect_test_intersects(&pGameState->BallRect, &pGameState->LeftPaddleRect) &&
+    else if (rect_test_intersect_result(&pGameState->BallRect, &pGameState->LeftPaddleRect, &intersectResult) &&
              pGameState->BallDirection.x < 0)
     {
         collision = LeftPaddleCollision;
     }
-    else if (rect_test_intersects(&pGameState->BallRect, &pGameState->RightPaddleRect) &&
+    else if (rect_test_intersect_result(&pGameState->BallRect, &pGameState->RightPaddleRect, &intersectResult) &&
              pGameState->BallDirection.x > 0)
     {
         collision = RightPaddleCollision;
@@ -158,13 +179,51 @@ void GameState_updateBall(GameState* pGameState)
     }
     else if (collision == LeftPaddleCollision)
     {
-        nextBallPos.x = rect_extent_right(&pGameState->LeftPaddleRect);
-        pGameState->BallDirection.x = -pGameState->BallDirection.x;
+        if (intersectResult.Separation.x < intersectResult.Separation.y)
+        {
+            nextBallPos.x = rect_extent_right(&pGameState->LeftPaddleRect);
+            collisionResponse_GetBounceVector(
+                &pGameState->BallRect,
+                &pGameState->LeftPaddleRect,
+                &pGameState->BallDirection);
+        }
+        else if (intersectResult.Separation.y > 0 && intersectResult.Separation.y < intersectResult.Separation.x)
+        {
+            if (pGameState->BallDirection.y > 0)
+            {
+                nextBallPos.y = rect_extent_top(&pGameState->LeftPaddleRect) - BALL_HEIGHT;
+                pGameState->BallDirection.y = -pGameState->BallDirection.y;
+            }
+            else
+            {
+                nextBallPos.y = rect_extent_bottom(&pGameState->LeftPaddleRect);
+                pGameState->BallDirection.y = -pGameState->BallDirection.y;
+            }
+        }
     }
     else if (collision == RightPaddleCollision)
     {
-        nextBallPos.x = rect_extent_left(&pGameState->RightPaddleRect) - BALL_WIDTH;
-        pGameState->BallDirection.x = -pGameState->BallDirection.x;
+        if (intersectResult.Separation.x < intersectResult.Separation.y)
+        {
+            nextBallPos.x = rect_extent_left(&pGameState->RightPaddleRect) - BALL_WIDTH;
+            collisionResponse_GetBounceVector(
+                &pGameState->BallRect,
+                &pGameState->RightPaddleRect,
+                &pGameState->BallDirection);
+        }
+        else if (intersectResult.Separation.y > 0 && intersectResult.Separation.y < intersectResult.Separation.x)
+        {
+            if (pGameState->BallDirection.y > 0)
+            {
+                nextBallPos.y = rect_extent_top(&pGameState->RightPaddleRect) - BALL_HEIGHT;
+                pGameState->BallDirection.y = -pGameState->BallDirection.y;
+            }
+            else
+            {
+                nextBallPos.y = rect_extent_bottom(&pGameState->RightPaddleRect);
+                pGameState->BallDirection.y = -pGameState->BallDirection.y;
+            }
+        }
     }
 
     // Apply position update
